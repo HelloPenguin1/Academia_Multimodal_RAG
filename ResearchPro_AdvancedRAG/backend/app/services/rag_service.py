@@ -1,0 +1,205 @@
+from langchain.chains import RetrievalQA
+from langchain.retrievers import EnsembleRetriever
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.chains import create_history_aware_retriever, create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+
+class RAG_Pipeline:
+    def __init__(self, llm , vectorstore=None):
+        self.llm = llm
+        self.vectorstore = vectorstore
+        self.hybrid_retriever = None
+        self.compression_retriever = None
+        self.conversational_rag = None
+        self.summary_cache = {}
+        self.document_processor = None
+        
+        self.reformulation_prompt = self.create_reformulation_prompt()
+        self.answer_prompt  = self.create_answer_prompt()
+
+    def set_document_processor(self, doc_processor):
+        """Store reference to document processor for table context retrieval"""
+        self.document_processor = doc_processor
+
+    def create_reformulation_prompt(self):
+        reform_sys_prompt = """
+        You are a research question reformulator for academic document analysis.
+        Given the conversation history and the latest user query, rewrite the query 
+        into a clear, self-contained research question. 
+
+        Guidelines:
+        - Preserve the user's intent completely.
+        - Expand abbreviations or vague references (e.g., "it", "they", "the table") using chat history.
+        - If the question involves data, tables, statistics, or numerical information, make that explicit.
+        - If referring to previous tables or data, include that context in the reformulation.
+        - Do NOT answer the question - only reformulate it.
+        - If the question is already clear and standalone, return it unchanged.
+        
+        Examples:
+        - "What does it show?" → "What data does the table on page X show?"
+        - "Compare them" → "Compare the results shown in Table 1 and Table 2"
+        """
+
+        return ChatPromptTemplate.from_messages([
+            ("system", reform_sys_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}")
+        ])
+
+
+
+
+    def create_answer_prompt(self):
+        answer_sys_prompt = """
+        You are an expert research assistant specialized in analyzing academic papers, 
+        with particular expertise in interpreting tables, charts, and quantitative data.
+
+        CRITICAL INSTRUCTIONS:
+        1. **Base answers ONLY on provided context** - never fabricate data or references.
+        
+        2. **When tables are present:**
+           - Carefully analyze the table structure, headers, and data
+           - Extract specific numbers, trends, and comparisons
+           - Explain what the data shows in clear, accessible language
+           - Note any patterns, outliers, or significant findings
+        
+        3. **For data-related questions:**
+           - Cite specific values from tables when available
+           - Compare multiple data points if relevant
+           - Explain the significance of the numbers
+        
+        4. **Structure your response:**
+           - Start with a direct answer to the question
+           - Support with specific data from tables/text
+           - Provide interpretation and context
+           - Mention limitations if data is incomplete
+        
+        5. **Maintain academic rigor:**
+           - Use precise language for quantitative information
+           - Distinguish between facts (from context) and interpretation
+           - If context lacks information, clearly state so
+        
+        6. **For tables/charts specifically:**
+           - Describe what type of data is presented (percentages, counts, measurements, etc.)
+           - Identify key comparisons being made
+           - Note any trends or relationships visible in the data
+           - Reference the page number when citing table data
+
+        Context (includes text passages and table data):
+        {context}
+        """
+
+        return ChatPromptTemplate.from_messages([
+            ("system", answer_sys_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}")
+        ])
+        
+        
+        
+    
+    def update_vectorstore(self, vectorstore):
+        self.vectorstore = vectorstore
+
+    def create_hybrid_retriever(self, syntactic_retriever, semantic_retriever):
+        self.hybrid_retriever = EnsembleRetriever(retrievers = [syntactic_retriever, semantic_retriever],
+                                             weights = [0.5,0.5])
+        return self.hybrid_retriever
+    
+    def set_compression_retriever(self, compression_retriever):
+        self.compression_retriever = compression_retriever
+    
+
+
+    def create_rag_chain(self, retriever):
+        history_aware_retriever = create_history_aware_retriever(
+            self.llm,
+            retriever,
+            self.reformulation_prompt
+        )
+
+        question_answer_chain = create_stuff_documents_chain(
+            self.llm,
+            self.answer_prompt
+        )
+
+        rag_pipeline = create_retrieval_chain(
+            history_aware_retriever,
+            question_answer_chain
+        )
+
+        return rag_pipeline
+    
+    
+    def create_conversational_chain(self, rag_chain, get_session_history_func):
+        self.conversational_rag = RunnableWithMessageHistory(
+            rag_chain,
+            get_session_history_func,
+            input_messages_key="input",
+            history_messages_key="chat_history",
+            output_messages_key="answer"
+        )
+
+        return self.conversational_rag
+
+
+    def query(self, question: str, session_id: str) -> str:
+        if not self.conversational_rag:
+            return "Error: Conversational chain not initialized"
+
+        try:
+            # Retrieve top-k documents
+            retrieved_docs = self.compression_retriever.get_relevant_documents(question)
+            top_k = retrieved_docs[:3]
+
+            # Summarize chunks with tables or images
+            summarized = []
+            
+            for doc in top_k:
+                page = doc.metadata.get("page_number")
+                
+                if doc.metadata.get("has_tables") or doc.metadata.get("has_images"):
+                    if page in self.summary_cache:
+                        summary = self.summary_cache[page]
+                    else: 
+                        summary = self.document_processor.multimodal_processor._generate_ai_summary(
+                            doc.page_content[:800],
+                            doc.metadata.get("original_tables", []),
+                            doc.metadata.get("original_images", [])
+                        )
+                        self.summary_cache[page] = summary
+                    
+                    if len(summary) > 600:
+                        summary = summary[:600]
+                    summarized.append(summary)
+                else:
+                    summarized.append(doc.page_content)
+
+            # Build context
+            summarized_context = "\n\n".join(summarized)
+            enhanced_input = f"{question}\n\nSUMMARIZED CONTEXT:\n{summarized_context}"
+            
+            # Inject table context
+            if self.document_processor and hasattr(self.document_processor, 'get_table_context'):
+                table_context = self.document_processor.get_table_context(question)
+                if table_context:
+                    enhanced_input += f"\n{table_context}"
+            
+            # Inject image context
+            if self.document_processor and hasattr(self.document_processor, 'get_image_context'):
+                image_context = self.document_processor.get_image_context(question)
+                if image_context:
+                    enhanced_input += f"\n{image_context}"
+
+            # Run conversational RAG chain
+            response = self.conversational_rag.invoke(
+                {"input": enhanced_input},
+                config={"configurable": {"session_id": session_id}}
+            )
+
+            return response.get("answer", "No response generated")  
+
+        except Exception as e:
+            return f"Error processing query: {str(e)}"
