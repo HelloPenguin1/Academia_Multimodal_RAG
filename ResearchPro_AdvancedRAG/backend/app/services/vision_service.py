@@ -54,7 +54,7 @@ class MultimodalProcessor:
                     filename=filepath,
                     strategy="hi_res",
                     infer_table_structure=True,
-                    extract_image_block_types=["Table", "Image", "Figure", "Graphic", "Plot"],
+                    extract_image_block_types=["Table", "Image", "Figure"],
                     extract_image_block_to_payload=True,
                     languages=["eng"],
                     page_range=",".join(str(p) for p in pages_with_tables)
@@ -121,7 +121,9 @@ class MultimodalProcessor:
                             },
                         ],
                     }
-                ]
+                ],
+                max_tokens=300,
+                temperature=0.1,
             )
 
             desc = response.choices[0].message.content
@@ -208,12 +210,12 @@ class MultimodalProcessor:
     def _generate_ai_summary(self, text, tables, images) -> str:        
         # Construct context for the LLM
         context_str = f"TEXT:\n{text}\n\n"
-        for i, table in enumerate(tables):
+        for i, table in enumerate(tables[:3]): #max 3 tables
             context_str += f"TABLE {i+1}:\n{table}\n\n"
     
         if images:
             context_str += f"\n[{len(images)} IMAGE(S) WITH DESCRIPTIONS]\n"
-            for i, img in enumerate(images, 1):
+            for i, img in enumerate(images[:3], 1):
                 description = img.get("description", "No description available")
                 if len(description) > 400:
                     description = description[:400] + "..." 

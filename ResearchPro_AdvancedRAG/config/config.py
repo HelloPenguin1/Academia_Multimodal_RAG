@@ -23,11 +23,27 @@ hf_embeddings = HuggingFaceEmbeddings(
     encode_kwargs = {'normalize_embeddings':True},
 )   
 
-llm = ChatGroq(model="openai/gpt-oss-20b", 
-               groq_api_key=groq_api_key)
+# Main LLM for final answer generation (large context window, best reasoning)
+llm = ChatGroq(model="llama-3.3-70b-versatile", 
+               groq_api_key=groq_api_key,
+               max_tokens=2048,      # Limit response to 2048 tokens
+               temperature=0.1,      # Add consistency
+               timeout=30            # 30 second timeout)
+               )
 
-llm_summarize = ChatGroq(model="llama-3.1-70b-versatile", 
-               groq_api_key=groq_api_key)
+# Lightweight LLM for query reformulation (reduces rate limit pressure)
+llm_reformulate = ChatGroq(model="llama-3.1-8b-instant",
+                           groq_api_key=groq_api_key,
+                           max_tokens=256,       # Short reformulated queries
+                           temperature=0.1,
+                           timeout=10)
+
+llm_summarize = ChatGroq(model="llama-3.3-70b-versatile", 
+               groq_api_key=groq_api_key,
+               max_tokens=512,       # Summaries should be brief (512 tokens ≈ 200 words)
+               temperature=0.1,      # Lower temperature for factual summaries
+               timeout=20            # 20 second timeout)
+               )
 
 
 vision_model = "meta-llama/llama-4-scout-17b-16e-instruct"

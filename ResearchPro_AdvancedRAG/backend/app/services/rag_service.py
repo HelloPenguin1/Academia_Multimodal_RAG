@@ -145,6 +145,15 @@ class RAG_Pipeline:
         return self.conversational_rag
 
 
+
+
+
+
+
+
+
+
+
     def query(self, question: str, session_id: str) -> str:
         if not self.conversational_rag:
             return "Error: Conversational chain not initialized"
