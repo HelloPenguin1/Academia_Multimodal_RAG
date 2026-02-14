@@ -41,8 +41,7 @@ class MultimodalProcessor:
 
         print(f"Detected table/image pages: {sorted(list(pages_with_tables))}")
         
-        
-
+    
 
         # Step 2: If no tables/images → use fast output only
         if not pages_with_tables:
@@ -131,9 +130,6 @@ class MultimodalProcessor:
         
         except Exception as e:
             return "[Image could not be analyzed]"
-
-
-
 
 
     def _convert_chunks_without_summary(self, chunks) -> list[Document]:

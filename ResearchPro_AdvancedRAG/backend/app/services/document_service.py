@@ -9,59 +9,19 @@ class DocumentProcessor:
         self.vectorstore = None
         self.multimodal_processor = MultimodalProcessor()
         self.processed_docs = []
-        self.extracted_tables = []
 
     def load_and_process_pdf(self, filepath: str):
         self.processed_docs = self.multimodal_processor.load_and_process(filepath)
-        self.extracted_tables = self._extract_tables_from_docs(self.processed_docs)
-        self.extracted_images = self._extract_images_from_docs(self.processed_docs)
-        print(f"Generated {len(self.processed_docs)} enriched documents with {len(self.extracted_tables)} tables.")
-        print("Extracted tables:")
-        for i, t in enumerate(self.extracted_tables):
-            print(i, "Page:", "Preview:", t['content'][:100])
-            
-        
 
         return self.processed_docs
     
-    def _extract_tables_from_docs(self, docs):
-        """Extract tables from processed documents for separate indexing"""
-        extracted_tables = []
-        for doc in docs:
-            if doc.metadata.get('has_tables', False):
-                tables = doc.metadata.get('original_tables', [])
-                for table_html in tables:
-                    extracted_tables.append({
-                        'content': table_html,
-                        'html': table_html,
-                        'page_number': doc.metadata.get('page_number', 0),
-                        'source': 'pdf'
-                    })
-        
-        return extracted_tables
-    
-    def _extract_images_from_docs(self, docs):
-        """Extract images from processed documents for separate indexing"""
-        extracted_images = []
-        for doc in docs:
-            if doc.metadata.get("has_images", False):
-                imgs = doc.metadata.get("original_images", [])
-                for img in imgs:
-                    extracted_images.append({
-                        "content": "[IMAGE BASE64]",
-                        "base64":  img.get("base64"),
-                        "description": img.get("description"),
-                        "page_number": doc.metadata.get("page_number", 0),
-                        "source": "image"
-                    })
-        return extracted_images
-    
+    #Removed extract tables and images 
     
     
 
     def create_retriever(self, docs):
         """
-        Creates Semantic (FAISS) and Syntactic (BM25) retrievers
+        Creates Semantic retrievers
         """
         # Semantic Retriever (Vector Search)
         print("Creating vector store...")
