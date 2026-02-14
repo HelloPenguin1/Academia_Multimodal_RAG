@@ -182,8 +182,21 @@ class MultimodalProcessor:
                                 "description": description
                             })
 
+            # Enrich page_content with tables and image descriptions
+            enriched_content = text
+            
+            if tables:
+                enriched_content += "\n\n--- TABLES ---\n"
+                for i, table_html in enumerate(tables, 1):
+                    enriched_content += f"\n[TABLE {i}]\n{table_html}\n"
+            
+            if images:
+                enriched_content += "\n\n--- IMAGE DESCRIPTIONS ---\n"
+                for i, img in enumerate(images, 1):
+                    enriched_content += f"\n[IMAGE {i}]: {img['description']}\n"
+
             doc = Document(
-                page_content=text,
+                page_content=enriched_content,
                 metadata={
                     "source": "pdf",
                     "has_tables": len(tables) > 0,
@@ -200,38 +213,38 @@ class MultimodalProcessor:
 
     
 
-    def _generate_ai_summary(self, text, tables, images) -> str:        
-        # Construct context for the LLM
-        context_str = f"TEXT:\n{text}\n\n"
-        for i, table in enumerate(tables[:3]): #max 3 tables
-            context_str += f"TABLE {i+1}:\n{table}\n\n"
+    # def _generate_ai_summary(self, text, tables, images) -> str:        
+    #     # Construct context for the LLM
+    #     context_str = f"TEXT:\n{text}\n\n"
+    #     for i, table in enumerate(tables[:3]): #max 3 tables
+    #         context_str += f"TABLE {i+1}:\n{table}\n\n"
     
-        if images:
-            context_str += f"\n[{len(images)} IMAGE(S) WITH DESCRIPTIONS]\n"
-            for i, img in enumerate(images[:3], 1):
-                description = img.get("description", "No description available")
-                if len(description) > 400:
-                    description = description[:400] + "..." 
-                context_str += f"\nImage {i}: {description}\n"
+    #     if images:
+    #         context_str += f"\n[{len(images)} IMAGE(S) WITH DESCRIPTIONS]\n"
+    #         for i, img in enumerate(images[:3], 1):
+    #             description = img.get("description", "No description available")
+    #             if len(description) > 400:
+    #                 description = description[:400] + "..." 
+    #             context_str += f"\nImage {i}: {description}\n"
 
-        prompt = f"""You are a concise research summarizer. Create a brief, searchable summary integrating text, tables, and visual elements.
+    #     prompt = f"""You are a concise research summarizer. Create a brief, searchable summary integrating text, tables, and visual elements.
 
-        SUMMARY RULES:
-        - Extract core findings, methodology, and key results from text
-        - Convert tables to brief data statements with exact numbers (e.g., "Accuracy increased from 50% to 85%")
-        - Synthesize key insights from image descriptions—extract metrics, trends, and patterns
-        - Preserve domain terms, metric names, and visual insights for searchability
-        - Never invent data—only use what's explicitly shown
-        - Keep under 200 words; prioritize key insights over completeness
+    #     SUMMARY RULES:
+    #     - Extract core findings, methodology, and key results from text
+    #     - Convert tables to brief data statements with exact numbers (e.g., "Accuracy increased from 50% to 85%")
+    #     - Synthesize key insights from image descriptions—extract metrics, trends, and patterns
+    #     - Preserve domain terms, metric names, and visual insights for searchability
+    #     - Never invent data—only use what's explicitly shown
+    #     - Keep under 200 words; prioritize key insights over completeness
 
-        CONTENT:
-        {context_str}
+    #     CONTENT:
+    #     {context_str}
 
-        SUMMARY (direct, no formatting tags):"""
+    #     SUMMARY (direct, no formatting tags):"""
 
-        try:
-            response = self.llm.invoke([HumanMessage(content=prompt)])
-            return response.content
-        except Exception as e:
-            print(f"Summary failed: {e}")
-            return text
+    #     try:
+    #         response = self.llm.invoke([HumanMessage(content=prompt)])
+    #         return response.content
+    #     except Exception as e:
+    #         print(f"Summary failed: {e}")
+    #         return text

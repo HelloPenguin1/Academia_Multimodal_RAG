@@ -17,7 +17,6 @@ class DocumentProcessor:
     
     #Removed extract tables and images 
     
-    
 
     def create_retriever(self, docs):
         """
@@ -39,7 +38,5 @@ class DocumentProcessor:
     def get_statistics(self) -> dict:
         return {
             "processed_documents": len(self.processed_docs),
-            "extracted_tables": len(self.extracted_tables),
-            "extracted_images": len(self.extracted_images) if hasattr(self, 'extracted_images') else 0,
             "vectorstore_ready": self.vectorstore is not None
         }

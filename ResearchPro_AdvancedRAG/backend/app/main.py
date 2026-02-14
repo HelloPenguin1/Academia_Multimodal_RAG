@@ -62,7 +62,6 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         compression_retriever = reranker.create_compression_retriever(semantic_retriever)
         
         rag_pipeline.set_compression_retriever(compression_retriever)
-        rag_pipeline.set_document_processor(document_processor)
        
         # Update vectorstore
         if document_processor.vectorstore:
@@ -86,9 +85,7 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         return {
             "message": f"File uploaded and retriever initialized successfully.",
             "stats": {
-                "documents": len(docs),
-                "tables": len(document_processor.extracted_tables),
-                "images": len(document_processor.extracted_images) if hasattr(document_processor, 'extracted_images') else 0
+                "documents": len(docs)
             }
         }
     
@@ -106,7 +103,7 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
 @app.post('/query')
 async def query_rag(query: QueryRequest):
     try:
-        result = rag_pipeline.query(query.query, query.session_id)
+        result = rag_pipeline.query(query.query, query.session_id)  # query is a function. since we already set conversational_rag in ragpipelien in ine 76
         return {"response": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
@@ -120,11 +117,7 @@ async def deletevectorstore():
         rag_pipeline.vectorstore = None
         document_processor.vectorstore = None
         rag_pipeline.compression_retriever = None  
-        rag_pipeline.conversational_rag = None  
-        if hasattr(document_processor, 'extracted_tables'):
-            document_processor.extracted_tables = []
-        if hasattr(document_processor, 'extracted_images'):
-            document_processor.extracted_images = []
+        rag_pipeline.conversational_rag = None
         session_manager.clear_all_sessions()
         return {"message": "Vectorstore and sessions cleared"}
     except Exception as e:

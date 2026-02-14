@@ -13,15 +13,10 @@ class RAG_Pipeline:
         self.hybrid_retriever = None
         self.compression_retriever = None
         self.conversational_rag = None
-        self.summary_cache = {}
-        self.document_processor = None
         
         self.reformulation_prompt = self.create_reformulation_prompt()
         self.answer_prompt  = self.create_answer_prompt()
 
-    def set_document_processor(self, doc_processor):
-        """Store reference to document processor for table context retrieval"""
-        self.document_processor = doc_processor
 
     def create_reformulation_prompt(self):
         reform_sys_prompt = """
@@ -148,41 +143,9 @@ class RAG_Pipeline:
             return "Error: Conversational chain not initialized"
 
         try:
-            # Retrieve top-k documents
-            retrieved_docs = self.compression_retriever.get_relevant_documents(question)
-            top_k = retrieved_docs[:3]
-
-            # Summarize chunks with tables or images
-            summarized = []
-            
-            for doc in top_k:
-                page = doc.metadata.get("page_number")
-                
-                if doc.metadata.get("has_tables") or doc.metadata.get("has_images"):
-                    if page in self.summary_cache:
-                        summary = self.summary_cache[page]
-                    else: 
-                        summary = self.document_processor.multimodal_processor._generate_ai_summary(
-                            doc.page_content[:800],
-                            doc.metadata.get("original_tables", []),
-                            doc.metadata.get("original_images", [])
-                        )
-                        self.summary_cache[page] = summary
-                    
-                    if len(summary) > 600:
-                        summary = summary[:600]
-                    summarized.append(summary)
-                else:
-                    summarized.append(doc.page_content)
-
-            # Build context
-            summarized_context = "\n\n".join(summarized)
-            enhanced_input = f"{question}\n\nSUMMARIZED CONTEXT:\n{summarized_context}"
-            
-
-            # Run conversational RAG chain
+            # Run conversational RAG chain (retrieval happens internally)
             response = self.conversational_rag.invoke(
-                {"input": enhanced_input},
+                {"input": question},
                 config={"configurable": {"session_id": session_id}}
             )
 
