@@ -30,19 +30,12 @@ try:
     )
     from datasets import Dataset
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-except ImportError as e:
-    print("=" * 80)
-    print("❌ MISSING DEPENDENCIES")
-    print("=" * 80)
-    print("\nPlease install RAGAS and dependencies:")
-    print("  pip install ragas langchain-openai datasets")
-    print("\n" + "=" * 80)
-    sys.exit(1)
+
 
 
 def load_rag_results(results_path="backend/app/evaluation/rag_results.json"):
     """Load the RAG results from JSON file."""
-    print(f"📂 Loading results from: {results_path}")
+    print(f"Loading results from: {results_path}")
     
     if not os.path.exists(results_path):
         raise FileNotFoundError(
@@ -72,7 +65,7 @@ def evaluate_with_ragas(test_data):
     print("=" * 80)
     
     # Initialize evaluator LLM (uses OpenAI by default)
-    print("\n🤖 Initializing evaluator LLM (GPT-4)...")
+    print("\n🤖 Initializing evaluator LLM")
     evaluator_llm = ChatOpenAI(model="gpt-4", temperature=0)
     evaluator_embeddings = OpenAIEmbeddings()
     print("✅ Evaluator ready")

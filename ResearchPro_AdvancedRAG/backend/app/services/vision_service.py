@@ -123,13 +123,10 @@ class MultimodalProcessor:
                     }
                 ],
                 max_tokens=300,
-                temperature=0.1,
+                temperature=0,
             )
 
-            desc = response.choices[0].message.content
-            if len(desc) > 500:
-                desc = desc[:500] + "..."
-            self.image_cache[base64_img] = desc
+            desc = response.choices[0].message.content[:500]
             return desc
         
         except Exception as e:

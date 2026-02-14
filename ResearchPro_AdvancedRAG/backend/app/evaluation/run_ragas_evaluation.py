@@ -256,7 +256,7 @@ def main():
     # ============================================================================
     # CONFIGURATION: Update this path to your Vision Transformer PDF
     # ============================================================================
-    PDF_PATH = "backend/app/evaluation/Paper.pdf"
+    PDF_PATH = r"C:\dev\Projects\ResearchPro\ResearchPro_AdvancedRAG\backend\app\evaluation\Paper.pdf"
     
     # Check if PDF exists
     if not os.path.exists(PDF_PATH):

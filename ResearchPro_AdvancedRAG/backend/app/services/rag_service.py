@@ -44,7 +44,7 @@ class RAG_Pipeline:
 
         return ChatPromptTemplate.from_messages([
             ("system", reform_sys_prompt),
-            MessagesPlaceholder("chat_history"),
+            MessagesPlaceholder("chat_history"), 
             ("human", "{input}")
         ])
 
@@ -103,10 +103,6 @@ class RAG_Pipeline:
     def update_vectorstore(self, vectorstore):
         self.vectorstore = vectorstore
 
-    def create_hybrid_retriever(self, syntactic_retriever, semantic_retriever):
-        self.hybrid_retriever = EnsembleRetriever(retrievers = [syntactic_retriever, semantic_retriever],
-                                             weights = [0.5,0.5])
-        return self.hybrid_retriever
     
     def set_compression_retriever(self, compression_retriever):
         self.compression_retriever = compression_retriever
@@ -190,17 +186,6 @@ class RAG_Pipeline:
             summarized_context = "\n\n".join(summarized)
             enhanced_input = f"{question}\n\nSUMMARIZED CONTEXT:\n{summarized_context}"
             
-            # Inject table context
-            if self.document_processor and hasattr(self.document_processor, 'get_table_context'):
-                table_context = self.document_processor.get_table_context(question)
-                if table_context:
-                    enhanced_input += f"\n{table_context}"
-            
-            # Inject image context
-            if self.document_processor and hasattr(self.document_processor, 'get_image_context'):
-                image_context = self.document_processor.get_image_context(question)
-                if image_context:
-                    enhanced_input += f"\n{image_context}"
 
             # Run conversational RAG chain
             response = self.conversational_rag.invoke(

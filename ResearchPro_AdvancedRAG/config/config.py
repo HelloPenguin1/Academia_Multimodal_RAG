@@ -24,7 +24,7 @@ hf_embeddings = HuggingFaceEmbeddings(
 )   
 
 # Main LLM for final answer generation (large context window, best reasoning)
-llm = ChatGroq(model="llama-3.3-70b-versatile", 
+llm = ChatGroq(model="openai/gpt-oss-20b", 
                groq_api_key=groq_api_key,
                max_tokens=2048,      # Limit response to 2048 tokens
                temperature=0.1,      # Add consistency

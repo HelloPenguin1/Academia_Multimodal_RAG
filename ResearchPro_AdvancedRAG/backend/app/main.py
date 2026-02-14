@@ -57,10 +57,9 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         docs = document_processor.load_and_process_pdf(temp_file_path)
 
         # Create retrievers
-        semantic_retriever, syntactic_retriever = document_processor.create_retrievers(docs)
-        hybrid_retriever = rag_pipeline.create_hybrid_retriever(syntactic_retriever, semantic_retriever)
+        semantic_retriever = document_processor.create_retriever(docs)
         
-        compression_retriever = reranker.create_compression_retriever(hybrid_retriever)
+        compression_retriever = reranker.create_compression_retriever(semantic_retriever)
         
         rag_pipeline.set_compression_retriever(compression_retriever)
         rag_pipeline.set_document_processor(document_processor)
@@ -77,7 +76,7 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         rag_pipeline.conversational_rag = conversational_chain
 
         # Verify state
-        if not rag_pipeline.vectorstore or not rag_pipeline.hybrid_retriever or not rag_pipeline.conversational_rag:
+        if not rag_pipeline.vectorstore or not rag_pipeline.conversational_rag:
             raise HTTPException(status_code=500, detail="Failed to initialize RAG pipeline components")
 
         # Cleanup
@@ -120,7 +119,6 @@ async def deletevectorstore():
     try:
         rag_pipeline.vectorstore = None
         document_processor.vectorstore = None
-        rag_pipeline.hybrid_retriever = None
         rag_pipeline.compression_retriever = None  
         rag_pipeline.conversational_rag = None  
         if hasattr(document_processor, 'extracted_tables'):
