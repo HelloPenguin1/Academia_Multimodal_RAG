@@ -9,6 +9,7 @@ Usage:
 
 import sys
 import os
+import logging
 from pathlib import Path
 
 # Add project root to path
@@ -22,6 +23,9 @@ from backend.app.services.rag_service import RAG_Pipeline
 from backend.utils.session_manager import SessionManager
 import json
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 # Test data for Vision Transformer paper
@@ -87,21 +91,21 @@ def initialize_rag_pipeline(pdf_path: str):
     Returns:
         Tuple of (rag_pipeline, document_processor)
     """
-    print("INITIALIZING RAG PIPELINE")
+    logger.info("INITIALIZING RAG PIPELINE")
 
     # Instantiate components
     document_processor = DocumentProcessor()
     rag_pipeline = RAG_Pipeline(llm)
     session_manager = SessionManager()
     
-    print(f"\n📄 Loading PDF: {pdf_path}")
+    logger.info("Loading PDF: %s", pdf_path)
     
     # Load and process document
     docs = document_processor.load_and_process_pdf(pdf_path)
-    print(f"✅ Processed {len(docs)} document chunks")
+    logger.info("Processed %s document chunks", len(docs))
     
     # Create naive semantic retriever from the vectorstore
-    print("\n🔍 Creating naive semantic retriever...")
+    logger.info("Creating naive semantic retriever...")
     document_processor.vectorstore = FAISS.from_documents(docs, hf_embeddings)
     if not document_processor.vectorstore:
         raise Exception("Vectorstore initialization failed")
@@ -110,25 +114,26 @@ def initialize_rag_pipeline(pdf_path: str):
         search_kwargs={"k": 10}
     )
     rag_pipeline.retriever = naive_retriever
-    print("✅ Naive semantic retriever created")
+    logger.info("Naive semantic retriever created")
     
     # Update vectorstore
     rag_pipeline.update_vectorstore(document_processor.vectorstore)
-    print("✅ Vectorstore updated")
+    logger.info("Vectorstore updated")
     
     # Create RAG chain
-    print("\n⛓️  Creating conversational RAG chain...")
+    logger.info("Creating conversational RAG chain...")
     rag_chain = rag_pipeline.create_rag_chain(naive_retriever)
     conversational_chain = rag_pipeline.create_conversational_chain(
         rag_chain, 
         session_manager.get_session_history
     )
     rag_pipeline.conversational_rag = conversational_chain
-    print("✅ Conversational RAG chain created")
+    logger.info("Conversational RAG chain created")
     
-    print("\n" + "=" * 80)
-    print("RAG PIPELINE READY")
-    print("=" * 80)
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("RAG PIPELINE READY")
+    logger.info("=" * 80)
     
     return rag_pipeline, document_processor
 
@@ -145,18 +150,20 @@ def run_rag_on_questions(rag_pipeline, questions, session_id="ragas_eval_session
     Returns:
         Tuple of (answers, contexts_list)
     """
-    print("\n" + "=" * 80)
-    print("RUNNING RAG PIPELINE ON TEST QUESTIONS")
-    print("=" * 80)
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("RUNNING RAG PIPELINE ON TEST QUESTIONS")
+    logger.info("=" * 80)
     
     answers = []
     contexts_list = []
     
     for i, question in enumerate(questions, 1):
-        print(f"\n{'─' * 80}")
-        print(f"Question {i}/{len(questions)}")
-        print(f"{'─' * 80}")
-        print(f"Q: {question[:100]}...")
+        logger.info("")
+        logger.info("%s", "─" * 80)
+        logger.info("Question %s/%s", i, len(questions))
+        logger.info("%s", "─" * 80)
+        logger.info("Q: %s...", question[:100])
         
         try:
             # Get retrieved documents (contexts)
@@ -172,18 +179,19 @@ def run_rag_on_questions(rag_pipeline, questions, session_id="ragas_eval_session
             answers.append(answer)
             contexts_list.append(contexts)
             
-            print(f"Answer generated ({len(answer)} chars)")
-            print(f"Retrieved {len(contexts)} context chunks")
-            print(f"Preview: {answer[:150]}...")
+            logger.info("Answer generated (%s chars)", len(answer))
+            logger.info("Retrieved %s context chunks", len(contexts))
+            logger.info("Preview: %s...", answer[:150])
             
         except Exception as e:
-            print(f"❌ Error processing question: {str(e)}")
+            logger.error("Error processing question: %s", e)
             answers.append(f"Error: {str(e)}")
             contexts_list.append([])
     
-    print("\n" + "=" * 80)
-    print("RAG PIPELINE EXECUTION COMPLETE")
-    print("=" * 80)
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("RAG PIPELINE EXECUTION COMPLETE")
+    logger.info("=" * 80)
     
     return answers, contexts_list
 
@@ -196,7 +204,7 @@ def save_results(test_data, output_path="backend/app/evaluation/baseline_rag_res
         test_data: Dictionary with questions, answers, contexts, and ground truth
         output_path: Path to save the results
     """
-    print(f"\n💾 Saving results to: {output_path}")
+    logger.info("Saving results to: %s", output_path)
     
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -214,31 +222,33 @@ def save_results(test_data, output_path="backend/app/evaluation/baseline_rag_res
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     
-    print(f"Results saved successfully")
+    logger.info("Results saved successfully")
     return output_path
 
 
 def print_summary(test_data):
     """Print a summary of the results."""
-    print("\n" + "=" * 80)
-    print("SUMMARY")
-    print("=" * 80)
+    logger.info("")
+    logger.info("=" * 80)
+    logger.info("SUMMARY")
+    logger.info("=" * 80)
     
     num_questions = len(test_data["question"])
     num_answers = sum(1 for a in test_data["answer"] if a and not a.startswith("Error"))
     num_contexts = sum(1 for c in test_data["contexts"] if c)
     
-    print(f"Total Questions: {num_questions}")
-    print(f"Successful Answers: {num_answers}/{num_questions}")
-    print(f"Questions with Contexts: {num_contexts}/{num_questions}")
+    logger.info("Total Questions: %s", num_questions)
+    logger.info("Successful Answers: %s/%s", num_answers, num_questions)
+    logger.info("Questions with Contexts: %s/%s", num_contexts, num_questions)
     
     avg_answer_length = sum(len(a) for a in test_data["answer"]) / num_questions if num_questions > 0 else 0
     avg_contexts_per_q = sum(len(c) for c in test_data["contexts"]) / num_questions if num_questions > 0 else 0
     
-    print(f"Average Answer Length: {avg_answer_length:.0f} characters")
-    print(f"Average Contexts per Question: {avg_contexts_per_q:.1f}")
+    logger.info("Average Answer Length: %s characters", f"{avg_answer_length:.0f}")
+    logger.info("Average Contexts per Question: %s", f"{avg_contexts_per_q:.1f}")
     
-    print("\n" + "=" * 80)
+    logger.info("")
+    logger.info("=" * 80)
 
 
 def main():
@@ -248,16 +258,13 @@ def main():
     IMPORTANT: Update the PDF_PATH variable below to point to your Vision Transformer paper.
     """
     
-    # ============================================================================
-    # CONFIGURATION: Update this path to your Vision Transformer PDF
-    # ============================================================================
     PDF_PATH = r"C:\dev\Projects\ResearchPro\ResearchPro_AdvancedRAG\backend\app\evaluation\Paper.pdf"
     
     # Check if PDF exists
     if not os.path.exists(PDF_PATH):
-        print(f"\n❌ Error: PDF file not found at: {PDF_PATH}")
-        print("Please check the path and try again.")
-        print("\nMake sure the PDF is located at: backend/app/evaluation/Paper.pdf")
+        logger.error("PDF file not found at: %s", PDF_PATH)
+        logger.error("Please check the path and try again.")
+        logger.error("Make sure the PDF is located at: backend/app/evaluation/Paper.pdf")
         return
     
     try:
@@ -277,15 +284,13 @@ def main():
         # Step 5: Print summary
         print_summary(test_data)
         
-        print("\n✅ SUCCESS! Your test data is now ready for RAGAS evaluation.")
-        print(f"\nNext steps:")
-        print(f"1. Review the results in: {output_path}")
-        print(f"2. Run RAGAS evaluation using: python -m backend.app.evaluation.evaluate_with_ragas")
+        logger.info("SUCCESS! Your test data is now ready for RAGAS evaluation.")
+        logger.info("Next steps:")
+        logger.info("1. Review the results in: %s", output_path)
+        logger.info("2. Run RAGAS evaluation using: %s", "python -m backend.app.evaluation.evaluate_with_ragas")
         
     except Exception as e:
-        print(f"\n❌ Error during execution: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error during execution: %s", e)
 
 
 if __name__ == "__main__":
